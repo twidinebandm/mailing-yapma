@@ -6,8 +6,8 @@ import zipfile
 # Sayfa Ayarları
 st.set_page_config(page_title="Mailing Yapma Uygulaması", layout="wide")
 
-def generate_html(link_url, page_title):
-    """ZIP içine eklenecek, dinamik başlığa sahip HTML kodunu üretir."""
+def generate_html(link_url, page_title, is_sliced):
+    """ZIP içine eklenecek, dinamik başlığa ve duruma (kesik/tek parça) sahip HTML kodunu üretir."""
     html_template = f"""<html>
 <head>
 <title>{page_title}</title>
@@ -19,7 +19,11 @@ def generate_html(link_url, page_title):
 </style>
 </head>
 <body bgcolor="#FFFFFF" leftmargin="0" topmargin="0" marginwidth="0" marginheight="0">
-    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width: 1080px;" align="center">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width: 1080px;" align="center">"""
+    
+    # Eğer link varsa ve kesme işlemi yapıldıysa 3 parçalı HTML üret
+    if is_sliced:
+        html_template += f"""
         <tr>
             <td align="center">
                 <img src="./images/01_ust.jpg" alt="Üst Görsel">
@@ -36,7 +40,17 @@ def generate_html(link_url, page_title):
             <td align="center">
                 <img src="./images/03_alt.jpg" alt="Alt Görsel">
             </td>
-        </tr>
+        </tr>"""
+    # Link yoksa görseli tek parça olarak HTML'e ekle
+    else:
+        html_template += f"""
+        <tr>
+            <td align="center">
+                <img src="./images/01_tam_gorsel.jpg" alt="Mailing Görseli">
+            </td>
+        </tr>"""
+        
+    html_template += """
     </table>
 </body>
 </html>"""
@@ -48,56 +62,52 @@ st.title("🚀 Mailing Yapma Uygulaması")
 st.header("Adım 1: Genel Bilgiler")
 page_title = st.text_input("Sayfa Başlığı (ZIP dosyası adını ve sekme başlığını belirler)", "Mailing_Sablonu")
 
-# ADIM 2: GÖRSEL YÜKLEME
-st.header("Adım 2: Görsel Yükleme")
-uploaded_file = st.file_uploader("Mailing Görselinizi Yükleyin (JPG/PNG)", type=["jpg", "png", "jpeg"])
+# ADIM 2: LİNK EKLEME (Bu adım artık belirleyici)
+st.header("Adım 2: Link Ekleme (Opsiyonel)")
+st.info("💡 Eğer bir butona link verecekseniz buraya URL'i yapıştırın (Görseli bölme alanı açılacaktır). Düz, tıklanamaz bir görsel gönderecekseniz bu alanı boş bırakın.")
+target_link = st.text_input("Gidilecek URL (Örn: https://www.orneklink.com):", "")
+
+# ADIM 3: GÖRSEL YÜKLEME (Sürükle Bırak Vurgusu)
+st.header("Adım 3: Görsel Yükleme")
+uploaded_file = st.file_uploader("📥 Görselinizi Buraya Sürükleyip Bırakın veya Seçin (JPG/PNG)", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
     img = Image.open(uploaded_file)
     width, height = img.size
     
-    col1, col2 = st.columns([1, 1])
+    # Hedef link boş değilse True (Kesme işlemi yapılacak), boşsa False (Tek parça)
+    is_sliced = bool(target_link.strip())
     
-    with col1:
-        st.image(img, caption=f"Orijinal Görsel ({width}x{height} piksel)", use_container_width=True)
+    if is_sliced:
+        col1, col2 = st.columns([1, 1])
         
-    with col2:
-        # ADIM 3: GÖRSELİ BÖLME
-        st.header("Adım 3: Görseli Bölme (Dilimleme)")
-        st.write("Aşağıdaki kaydırıcıyı kullanarak butonun olduğu alanı belirleyin:")
-        
-        start_y, end_y = st.slider(
-            "Buton Başlangıç ve Bitiş Noktası (Piksel):",
-            min_value=0,
-            max_value=height,
-            value=(int(height * 0.6), int(height * 0.75)),
-            step=5
-        )
-        
-        top_img = img.crop((0, 0, width, start_y))
-        btn_img = img.crop((0, start_y, width, end_y))
-        bot_img = img.crop((0, end_y, width, height))
-        
-        st.write("🎯 **Dilimlenmiş Parçaların Önizlemesi:**")
-        st.image(btn_img, caption="Tıklanabilir Buton Alanı (Orta Kısım)", use_container_width=True)
-        
-        # ADIM 4: LİNK EKLEME
-        st.header("Adım 4: Link Ekleme")
-        target_link = st.text_input("Butona tıklandığında gidilecek URL:", "https://www.orneklink.com")
-        
-        # ADIM 5: TEST & ÖNİZLEME
-        st.header("Adım 5: Test & Önizleme")
-        st.success(f"'{page_title}' başlığı ile HTML yapısı oluşturuldu.")
-        
-        st.image(top_img, use_container_width=True)
-        st.markdown(f"👆 **Üst Görsel** | 👇 **Buton ({target_link})**")
-        st.image(btn_img, use_container_width=True)
-        st.markdown("👆 **Buton** | 👇 **Alt Görsel**")
-        st.image(bot_img, use_container_width=True)
-
-        # ADIM 6: ZIP OLARAK VERME
-        st.header("Adım 6: ZIP Olarak İndir")
-        
+        with col1:
+            st.image(img, caption=f"Orijinal Görsel ({width}x{height} piksel)", use_container_width=True)
+            
+        with col2:
+            # ADIM 4: GÖRSELİ BÖLME
+            st.header("Adım 4: Görseli Bölme (Dilimleme)")
+            st.write("Aşağıdaki kaydırıcıyı kullanarak butonun olduğu alanı belirleyin:")
+            
+            start_y, end_y = st.slider(
+                "Buton Başlangıç ve Bitiş Noktası (Piksel):",
+                min_value=0,
+                max_value=height,
+                value=(int(height * 0.6), int(height * 0.75)),
+                step=5
+            )
+            
+            top_img = img.crop((0, 0, width, start_y))
+            btn_img = img.crop((0, start_y, width, end_y))
+            bot_img = img.crop((0, end_y, width, height))
+            
+            st.write("🎯 **Dilimlenmiş Buton Alanı:**")
+            st.image(btn_img, use_container_width=True)
+            
+            st.success("HTML yapısı parçalı şekilde oluşturuldu.")
+            
+        # Parçalı ZIP Olarak Verme
+        st.header("Adım 5: ZIP Olarak İndir")
         top_bytes = io.BytesIO()
         btn_bytes = io.BytesIO()
         bot_bytes = io.BytesIO()
@@ -106,20 +116,46 @@ if uploaded_file is not None:
         btn_img.convert('RGB').save(btn_bytes, format='JPEG', quality=95)
         bot_img.convert('RGB').save(bot_bytes, format='JPEG', quality=95)
         
-        html_code = generate_html(target_link, page_title)
+        html_code = generate_html(target_link, page_title, is_sliced=True)
         
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
             zip_file.writestr("images/01_ust.jpg", top_bytes.getvalue())
             zip_file.writestr("images/02_buton.jpg", btn_bytes.getvalue())
             zip_file.writestr("images/03_alt.jpg", bot_bytes.getvalue())
-            # HTML dosyasının adını her zaman index.html olarak sabitliyoruz
             zip_file.writestr("index.html", html_code)
             
         st.download_button(
-            label="📦 Mailing Paketini İndir (ZIP)",
+            label="📦 Mailing Paketini İndir (Kesilmiş ZIP)",
             data=zip_buffer.getvalue(),
-            file_name=f"{page_title}.zip", # ZIP dosyasına sayfa başlığı adını veriyoruz
+            file_name=f"{page_title}.zip",
+            mime="application/zip",
+            type="primary"
+        )
+        
+    else:
+        # Link Yoksa (Tek Parça)
+        st.success("✨ Link girilmediği için görsel kesilmeden tek parça olarak HTML'e dökülmüştür.")
+        st.image(img, caption=f"Tek Parça Olarak Eklenecek Görsel ({width}x{height} piksel)", use_container_width=True)
+        
+        # Tek Parçalı ZIP Olarak Verme
+        st.header("Adım 4: ZIP Olarak İndir")
+        
+        img_bytes = io.BytesIO()
+        img.convert('RGB').save(img_bytes, format='JPEG', quality=95)
+        
+        html_code = generate_html(target_link, page_title, is_sliced=False)
+        
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            # Görseli tek parça olarak "images" klasörüne atıyoruz
+            zip_file.writestr("images/01_tam_gorsel.jpg", img_bytes.getvalue())
+            zip_file.writestr("index.html", html_code)
+            
+        st.download_button(
+            label="📦 Mailing Paketini İndir (Tek Parça ZIP)",
+            data=zip_buffer.getvalue(),
+            file_name=f"{page_title}.zip",
             mime="application/zip",
             type="primary"
         )
